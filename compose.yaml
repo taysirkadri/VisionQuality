@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    environment:
+      DEFECT_BACKEND: fake
+      DEFECT_MODEL_PATH: /app/models/best.pt
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    build: .
+    command: streamlit run src/industrial_defect_detection/streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+    environment:
+      DEFECT_BACKEND: fake
+      DEFECT_MODEL_PATH: /app/models/best.pt
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./models:/app/models:ro
+    depends_on:
+      api:
+        condition: service_started
+
