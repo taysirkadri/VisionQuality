@@ -33,6 +33,7 @@ def create_app(detector_factory: Callable[[Settings], Detector] = create_detecto
     )
     app.state.service = None
     app.state.model_error = None
+    app.state.provider_status = {"providers": []}
     app.state.metrics = {
         "requests_total": 0,
         "requests_success": 0,
@@ -44,8 +45,17 @@ def create_app(detector_factory: Callable[[Settings], Detector] = create_detecto
 
     def load_model() -> None:
         try:
-            app.state.service = DetectionService(detector_factory(settings))
+            detector = detector_factory(settings)
+            app.state.service = DetectionService(detector)
             app.state.model_error = None
+            if hasattr(detector, "provider_status"):
+                app.state.provider_status = detector.provider_status()
+                import numpy as np
+                warmup = np.zeros((settings.image_size, settings.image_size, 3), dtype=np.uint8)
+                for _ in range(settings.warmup_requests):
+                    detector.detect(warmup)
+            else:
+                app.state.provider_status = {"providers": [detector.backend]}
         except (InferenceError, ValueError) as exc:
             # Keep /healthz available so orchestrators receive a useful error.
             app.state.service = None
@@ -54,14 +64,21 @@ def create_app(detector_factory: Callable[[Settings], Detector] = create_detecto
     app.state.load_model = load_model
 
     @app.get("/healthz", tags=["operations"])
-    def healthz() -> dict[str, str | bool]:
+    def healthz() -> dict[str, object]:
         detector = app.state.service.detector if app.state.service else None
         return {
             "status": "ok" if app.state.service else "degraded",
             "model_loaded": app.state.service is not None,
             "model_backend": getattr(detector, "backend", "none"),
+            "providers": app.state.provider_status.get("providers", []),
+            "fp16": app.state.provider_status.get("fp16", False),
+            "fallback_provider": app.state.provider_status.get("fallback_provider"),
             "detail": app.state.model_error or "Model is ready.",
         }
+
+    @app.get("/providers", tags=["operations"])
+    def providers() -> dict[str, object]:
+        return app.state.provider_status
 
     @app.get("/metrics", tags=["operations"])
     def metrics() -> dict[str, int | float]:

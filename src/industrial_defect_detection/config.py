@@ -27,6 +27,14 @@ class Settings:
     image_size: int
     max_upload_bytes: int
     class_names: tuple[str, ...]
+    tensorrt_fp16: bool = True
+    tensorrt_device_id: int = 0
+    tensorrt_workspace_mb: int = 2048
+    tensorrt_engine_cache: Path = Path("models/tensorrt")
+    tensorrt_timing_cache: Path = Path("models/tensorrt")
+    provider_fallback: bool = True
+    warmup_requests: int = 10
+    max_batch_size: int = 1
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -40,11 +48,27 @@ class Settings:
             image_size=int(os.getenv("DEFECT_IMAGE_SIZE", "640")),
             max_upload_bytes=int(os.getenv("DEFECT_MAX_UPLOAD_BYTES", str(10 * 1024 * 1024))),
             class_names=names or DEFAULT_CLASS_NAMES,
+            tensorrt_fp16=os.getenv("DEFECT_TENSORRT_FP16", "true").lower() in {"1", "true", "yes"},
+            tensorrt_device_id=int(os.getenv("DEFECT_TENSORRT_DEVICE_ID", "0")),
+            tensorrt_workspace_mb=int(os.getenv("DEFECT_TENSORRT_MAX_WORKSPACE_MB", "2048")),
+            tensorrt_engine_cache=Path(
+                os.getenv("DEFECT_TENSORRT_ENGINE_CACHE", "models/tensorrt")
+            ),
+            tensorrt_timing_cache=Path(
+                os.getenv("DEFECT_TENSORRT_TIMING_CACHE", "models/tensorrt")
+            ),
+            provider_fallback=os.getenv("DEFECT_PROVIDER_FALLBACK", "true").lower()
+            in {"1", "true", "yes"},
+            warmup_requests=int(os.getenv("DEFECT_WARMUP_REQUESTS", "10")),
+            max_batch_size=int(os.getenv("DEFECT_MAX_BATCH_SIZE", "1")),
         )
 
     def validate(self) -> None:
-        if self.backend not in {"fake", "ultralytics", "onnx"}:
-            raise ValueError("DEFECT_BACKEND must be 'fake', 'ultralytics', or 'onnx'")
+        if self.backend not in {"fake", "ultralytics", "onnx", "onnx-tensorrt", "tensorrt"}:
+            raise ValueError(
+                "DEFECT_BACKEND must be 'fake', 'ultralytics', 'onnx', "
+                "'onnx-tensorrt', or 'tensorrt'"
+            )
         if not 0 < self.confidence < 1:
             raise ValueError("DEFECT_CONFIDENCE must be between 0 and 1")
         if not 0 < self.iou < 1:
@@ -53,3 +77,11 @@ class Settings:
             raise ValueError("DEFECT_IMAGE_SIZE must be at least 32")
         if self.max_upload_bytes < 1:
             raise ValueError("DEFECT_MAX_UPLOAD_BYTES must be positive")
+        if self.tensorrt_device_id < 0:
+            raise ValueError("DEFECT_TENSORRT_DEVICE_ID must be zero or greater")
+        if self.tensorrt_workspace_mb < 64:
+            raise ValueError("DEFECT_TENSORRT_MAX_WORKSPACE_MB must be at least 64")
+        if self.warmup_requests < 0:
+            raise ValueError("DEFECT_WARMUP_REQUESTS must be zero or greater")
+        if self.max_batch_size < 1:
+            raise ValueError("DEFECT_MAX_BATCH_SIZE must be at least 1")

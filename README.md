@@ -107,7 +107,7 @@ limit; change `DEFECT_MAX_UPLOAD_BYTES` only after assessing operational risk.
 
 | Variable | PyTorch / Ultralytics | ONNX Runtime |
 | --- | --- | --- |
-| `DEFECT_BACKEND` | `ultralytics` | `onnx` |
+| `DEFECT_BACKEND` | `ultralytics` | `onnx` / `onnx-tensorrt` |
 | `DEFECT_MODEL_PATH` | `models/best.pt` | `models/best.onnx` |
 | Runtime | PyTorch through Ultralytics | ONNX Runtime CPU provider |
 | Best fit | training, GPU/cloud inference | portable CPU/edge inference |
@@ -122,6 +122,24 @@ set DEFECT_BACKEND=onnx  # Windows PowerShell: $env:DEFECT_BACKEND = "onnx"
 The ONNX adapter accepts standard YOLOv8 detection exports in `(1, 4+C, N)` or
 `(1, N, 4+C)` layout, applies letterbox reversal, confidence filtering, and
 class-aware rendering after OpenCV NMS.
+
+### TensorRT and CUDA
+
+Set `DEFECT_BACKEND=onnx-tensorrt` and use an ONNX export at `DEFECT_MODEL_PATH`.
+ONNX Runtime will use TensorRT, then CUDA, then CPU according to available providers
+and `DEFECT_PROVIDER_FALLBACK`. Missing TensorRT support is reported explicitly rather
+than switching to the fake detector.
+
+```powershell
+pip install -e ".[tensorrt]"
+python scripts/verify_gpu.py
+python scripts/export_tensorrt.py models/best.onnx --fp16 --cache models/tensorrt
+python scripts/benchmark_inference.py models/best.onnx --provider tensorrt --fp16 --requests 100
+```
+
+GPU Compose and deployment steps are documented in
+[`docs/tensorrt-deployment.md`](docs/tensorrt-deployment.md). The service exposes
+active providers through `GET /providers` and GPU/model status through `GET /healthz`.
 
 ## Train
 

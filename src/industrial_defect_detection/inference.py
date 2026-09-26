@@ -148,6 +148,96 @@ class OnnxDetector:
         )
 
 
+@dataclass
+class TensorRTDetector(OnnxDetector):
+    """YOLOv8 ONNX detector accelerated by ORT TensorRT/CUDA providers."""
+
+    providers: tuple[str, ...] = ()
+    fallback_provider: str | None = None
+    backend: str = "onnx-tensorrt"
+
+    @classmethod
+    def load(cls, settings: Settings) -> TensorRTDetector:
+        _ensure_model_exists(settings.model_path)
+        try:
+            import onnxruntime as ort
+        except ImportError as exc:
+            raise InferenceError(
+                "Install 'onnxruntime-gpu' and NVIDIA CUDA/TensorRT libraries for TensorRT."
+            ) from exc
+
+        try:
+            available = set(ort.get_available_providers())
+        except Exception as exc:
+            raise InferenceError(f"Could not query ONNX Runtime providers: {exc}") from exc
+
+        if "TensorrtExecutionProvider" not in available:
+            if settings.provider_fallback and "CUDAExecutionProvider" in available:
+                providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                fallback = "onnx-cuda"
+            elif settings.provider_fallback:
+                providers = ["CPUExecutionProvider"]
+                fallback = "onnx-cpu"
+            else:
+                raise InferenceError(
+                    "TensorRTExecutionProvider is unavailable and provider fallback is disabled."
+                )
+        else:
+            cache = settings.tensorrt_engine_cache
+            timing = settings.tensorrt_timing_cache
+            cache.mkdir(parents=True, exist_ok=True)
+            timing.mkdir(parents=True, exist_ok=True)
+            provider_options = {
+                "device_id": settings.tensorrt_device_id,
+                "trt_fp16_enable": settings.tensorrt_fp16,
+                "trt_engine_cache_enable": True,
+                "trt_engine_cache_path": str(cache),
+                "trt_timing_cache_enable": True,
+                "trt_timing_cache_path": str(timing),
+                "trt_max_workspace_size": settings.tensorrt_workspace_mb * 1024 * 1024,
+                "trt_force_sequential_engine_build": False,
+            }
+            providers = [
+                ("TensorrtExecutionProvider", provider_options),
+                "CUDAExecutionProvider",
+                "CPUExecutionProvider",
+            ]
+            fallback = "onnx-tensorrt"
+
+        try:
+            session = ort.InferenceSession(
+                str(settings.model_path),
+                providers=providers,
+            )
+        except Exception as exc:
+            raise InferenceError(f"Could not initialize TensorRT/CUDA ONNX session: {exc}") from exc
+
+        active = tuple(session.get_providers())
+        active_names = set(active)
+        if "TensorrtExecutionProvider" not in active_names:
+            if "CUDAExecutionProvider" in active_names:
+                fallback = "onnx-cuda"
+            else:
+                fallback = "onnx-cpu"
+        return cls(
+            session=session,
+            input_name=session.get_inputs()[0].name,
+            settings=settings,
+            providers=active,
+            fallback_provider=fallback,
+            backend="onnx-tensorrt",
+        )
+
+    def provider_status(self) -> dict[str, object]:
+        return {
+            "providers": list(self.providers),
+            "fp16": self.settings.tensorrt_fp16,
+            "device_id": self.settings.tensorrt_device_id,
+            "workspace_mb": self.settings.tensorrt_workspace_mb,
+            "fallback_provider": self.fallback_provider,
+        }
+
+
 def create_detector(settings: Settings) -> Detector:
     """Construct a real detector when available, otherwise use the demo fallback."""
     settings.validate()
@@ -158,7 +248,11 @@ def create_detector(settings: Settings) -> Detector:
             return UltralyticsDetector.load(settings)
         if settings.backend == "onnx":
             return OnnxDetector.load(settings)
+        if settings.backend in {"onnx-tensorrt", "tensorrt"}:
+            return TensorRTDetector.load(settings)
     except InferenceError:
+        if settings.backend in {"onnx-tensorrt", "tensorrt"}:
+            raise
         pass
     return FakeDetector.load(settings)
 

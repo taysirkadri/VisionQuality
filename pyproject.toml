@@ -25,6 +25,9 @@ model = [
   "ultralytics>=8.3,<9.0",
   "onnxruntime>=1.19,<2.0",
 ]
+tensorrt = [
+  "onnxruntime-gpu>=1.19,<2.0",
+]
 dashboard = [
   "streamlit>=1.39,<2.0",
 ]
