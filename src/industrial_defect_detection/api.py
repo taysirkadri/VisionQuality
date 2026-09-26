@@ -26,7 +26,7 @@ def create_app(detector_factory: Callable[[Settings], Detector] = create_detecto
         yield
 
     app = FastAPI(
-        title="Industrial Defect Detection API",
+        title="VisionQuality Defect Detection API",
         version="0.1.0",
         description="YOLOv8 defect detection over PyTorch or ONNX Runtime.",
         lifespan=lifespan,
@@ -75,7 +75,7 @@ def create_app(detector_factory: Callable[[Settings], Detector] = create_detecto
 
     @app.get("/", tags=["operations"])
     def root() -> dict[str, str]:
-        return {"service": "industrial-defect-detection", "docs": "/docs"}
+        return {"service": "vision-quality", "docs": "/docs"}
 
     @app.post("/v1/detect", response_model=DetectionResponse, tags=["inference"])
     async def detect(

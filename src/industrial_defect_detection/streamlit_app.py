@@ -17,8 +17,8 @@ def _service() -> DetectionService:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Industrial Defect Detection", page_icon="🔎", layout="wide")
-    st.title("Industrial Defect Detection")
+    st.set_page_config(page_title="VisionQuality", page_icon="🔎", layout="wide")
+    st.title("VisionQuality")
     st.caption("YOLOv8 visual inspection with PyTorch or ONNX Runtime")
     st.info(
         "Upload an image from a validated inspection workflow. Results are decision support, "

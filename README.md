@@ -1,6 +1,6 @@
 # VisionQuality
 
-[![CI](https://github.com/Divzy-B/industrial-defect-detection/actions/workflows/ci.yml/badge.svg)](https://github.com/Divzy-B/industrial-defect-detection/actions/workflows/ci.yml)
+[![CI](https://github.com/taysirkadri/VisionQuality/actions/workflows/ci.yml/badge.svg)](https://github.com/taysirkadri/VisionQuality/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An end-to-end, deployment-ready template for detecting industrial surface defects
@@ -52,8 +52,8 @@ Python 3.10+ is required. The inference dependencies include PyTorch and can be
 large; use an environment appropriate for your CPU/GPU and operating system.
 
 ```bash
-git clone https://github.com/Divzy-B/industrial-defect-detection.git
-cd industrial-defect-detection
+git clone https://github.com/taysirkadri/VisionQuality.git
+cd VisionQuality
 python -m venv .venv
 # Windows: .venv\Scripts\activate
 # macOS/Linux: source .venv/bin/activate
